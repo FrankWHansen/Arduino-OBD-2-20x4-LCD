@@ -50,7 +50,7 @@ void loop() {
   lcd.print(getTemp()); //Print the int returned from getTemp
   lcd.print(" C");
   
-  delay(400);//wait .4 seconds and grab another reading
+  delay(500);//wait .5 seconds and grab another reading
 
 }
 
