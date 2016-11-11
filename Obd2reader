@@ -39,20 +39,18 @@ void loop() {
   //Delete any data that may be left over in the serial port.
   Serial.flush();
   //Move the serial cursor to the position where we want the RPM data.
-  lcd.print(" "); 
-  lcd.write(254);
-  lcd.write(128 + 69);
+  lcd.print(" ");
+  lcd.setCursor(6, 1);
   lcd.print(getRPM()); //Print the int returned from getRPM
   
   Serial.flush();
   
   lcd.print(" ");
-  lcd.write(254);
-  lcd.write(128 + 6);
+  lcd.setCursor(6, 0);
   lcd.print(getTemp()); //Print the int returned from getTemp
   lcd.print(" C");
   
-  delay(200);//wait .2 seconds and grab another reading
+  delay(400);//wait .4 seconds and grab another reading
 
 }
 
