@@ -1,0 +1,129 @@
+  // I've taken example code from Sparkfun, but a fixed version from kiteman (3rd post from top), at
+  // https://forum.sparkfun.com/viewtopic.php?f=14&t=35507, and modified it since I'm working with
+  // a parallel LCD screen and I want to read Diagnostic Trouble Code(DTC)s instead of getting a live
+  // feed of data from the car (speed, rpm, coolant temp etc).
+  
+  // I currently have an ugly prototype of a scantool, that might at any moment fall apart during normal operation,
+  // but my plan is to implement this work-in-progress software in a more compact and user-friendly form factor.
+
+  // A DTC consists of a five-character code - one letter followed by four digits.
+  // https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_3_.28no_PID_required.29 is a great reference to understand its composition.
+  
+  // include the library code for parallel LCD screen:
+  #include <LiquidCrystal.h>
+
+  // initialize the library with the numbers of the interface pins
+  LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+
+  //This is a character buffer that will store the data from the serial port
+  char rxData[20];
+  char rxIndex=0;
+  // This will hopefully work as an array that stores fault codes
+  uint16_t DTCbin[];
+  String DTCascii;
+
+  // An array that stores the 4 possible letters that make out the most significant value of the DTC
+  char DTCletter[] = {P, C, B, U}; // P = Powertrain, C = Chassis, B = Body, U = Network
+
+
+  // setup() runs once, before loop() takes over and loops indefinitely
+void setup() {
+  // Initiate serial connection with OBD-2 board @ 9600 baud
+  Serial.begin(9600);
+  
+  // set up the LCD's number of columns and rows:
+  lcd.begin(20, 4);
+  // Print a message to the LCD.
+  lcd.setCursor(0,1);
+  lcd.print("On-Board Diagnostics");
+  lcd.setCursor(1,1);
+  // just a simple test to see if the variables are stored correctly in DTCletter[]
+  lcd.print(DTCletter[]);
+  // Runs function OBD_init() to reset the board and turn off echoing
+  OBD_init();
+  lcd.clear();
+  //delay(250);
+  lcd.setCursor(0, 0);
+  lcd.print("DTC1: ");
+  lcd.setCursor(0, 1);
+  lcd.print("DTC2: ");
+  lcd.setCursor(0, 2);
+  lcd.print("DTC3: ");
+  lcd.noCursor();
+}
+
+  // after setup() runs once, loop() can run indefinitely
+void loop() {
+  // Delete any data that may be left over in the serial port.
+  Serial.flush();
+  obd_init();
+  delay(5000);
+  getDTC(); //run getDTC() to retrieve fault codes
+  delay(240000); // delay 240 seconds
+  
+}
+
+void OBD_init(void) {
+  //Wait for a little while before sending the reset command to the OBD-II-UART
+  delay(2000);
+  //Reset the OBD-II-UART
+  Serial.print("ATZ\r");
+  //Wait for a bit before starting to send commands after the reset.
+  delay(2000);
+  OBD_read();
+  Serial.print("ATE0\r");
+  OBD_read();
+  Serial.flush();
+}
+
+String getDTC(void) {
+  Serial.flush();
+  // OBD-2 mode 03 means "Read DTCs!"
+  Serial.print("03\r");
+  // read incoming data from OBD-2 card
+  OBD_read();
+  delay(100);
+  // this for loop will iterate through the fault codes, and turn them into human-readable form
+  for (int i = 2; i < rxIndex; i+2) {
+    // Make a local variable that takes the first byte but shifted six times to the right, to be left with only a two-bit value
+    int letter = (rxData[i-2] >> 6);
+    // create a local String variable to start construction of a fault code from the deconstructed bytes
+    String localDTC = DTCletter[letter];
+    // The first digit also consists of only two bits (decimal values range from 0 up to and including 3)
+    // First we have to force the two bits forming the letter out of the byte
+    int digit1 = (rxData[i-2] << 2);
+    // Then we can force the four bits forming digit2 out of the byte
+    int digit1 = (rxData[i-2] >> 6);
+    
+    append digit1 to localDTC
+    
+    // Just realized i can bitmask... instead of elminiating bits by shifting left
+    int digit2 = (rxData[i-2] & 0b00001111);
+    
+    int digit3 = (rxData[i-1] & 0b11110000) >> 4;
+    
+    int digit4 = (rxData[i-1] & 0b00001111);
+    
+    DTClocalDTC
+    
+    
+    
+  }
+}
+
+// This function stores each byte read in a local variable, adds it to the global buffer array rxData[]
+void OBD_read(void) {
+  char c;
+  do{
+    if(Serial.available() > 0)
+    {
+      c = Serial.read();
+      //lcd.print(c);
+      if((c!= '>') && (c!='\r') && (c!='\n')) //Keep these out of our buffer
+      {
+        rxData[rxIndex++] = c; //Add whatever we receive to the buffer
+      }
+     }
+  }while(c != '>'); //The ELM327 ends its response with this char so when we get it we exit out.
+  rxData[rxIndex++] = '\0';//Converts the array into a string
+  rxIndex=0; //Set this to 0 so next time we call the read we get a "clean buffer"
