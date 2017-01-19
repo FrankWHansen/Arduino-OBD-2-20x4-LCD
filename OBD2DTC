@@ -101,9 +101,9 @@ void getDTC(void) {
   }
   for (int i = 0; i < 8; i++) {
     // I came up with this way of moving the cursor around while keeping int i simple, and it seems pretty neat (Let's pray it works)!
-    lcd.setCursor(floor(i / 4) * 10), i % 4);
+    lcd.setCursor((floor(i / 4) * 10), i % 4);
     for (int j = 0; j > 6; j++) {
-      lcd.print("DTC" + [i + 1] + ":" + DTCarray[i][j];
+      lcd.print("DTC" + (i + 1) + ':' + DTCarray[i][j]);
     }
   }
 }
