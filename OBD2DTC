@@ -1,15 +1,20 @@
   // I've taken example code from Sparkfun, but a fixed version from kiteman (3rd post from top), at
   // https://forum.sparkfun.com/viewtopic.php?f=14&t=35507, and modified it since I'm working with
   // a parallel LCD screen and I want to read Diagnostic Trouble Code(DTC)s instead of getting a live
-  // feed of data from the car (speed, rpm, coolant temp etc).
+  // feed of data from the car (speed, rpm, coolant temp etc) like most people seem to be interested in.
   
-  // I currently have an ugly prototype of a scantool, that might at any moment fall apart during normal operation,
+  // I currently have an ugly prototype of a scantool, that might at any moment fall apart,
   // but my plan is to implement this work-in-progress software in a more compact and user-friendly form factor.
 
   // A DTC consists of a five-character code - one letter followed by four digits.
   // https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_3_.28no_PID_required.29 is a great reference to understand its composition.
+
+  // There is a great chance this code isn't working at all because of my inexperience, but if it is,
+  // take special care not to trust more than the first 2 DTCs:
+  // As the link to wiki states, further DTCs will come with overhead/frames from the car, and I need to analyze the different manufacturer's protocols
+  // to be able to figure out how to extract the information I need to produce more DTCs.
   
-  // include the library code for parallel LCD screen:
+  // include library for parallel LCD screen:
   #include <LiquidCrystal.h>
 
   // initialize the library with the numbers of the interface pins
@@ -18,15 +23,14 @@
   //This is a character buffer that will store the data from the serial port
   char rxData[20];
   char rxIndex=0;
-  // This will hopefully work as an array that stores fault codes
-  uint16_t DTCbin[];
-  String DTCascii;
 
   // An array that stores the 4 possible letters that make out the most significant value of the DTC
-  char DTCletter[] = {P, C, B, U}; // P = Powertrain, C = Chassis, B = Body, U = Network
+  char DTCletter[5] = {'P', 'C', 'B', 'U', '\0'}; // P = Powertrain, C = Chassis, B = Body, U = Network, '\0' = null character that arrays apparently always technically end with.
 
+  // I'll make room for 8 DTCs. Each row in this array will store a DTC of five chars plus the null character.
+  char DTCarray[8][6];
 
-  // setup() runs once, before loop() takes over and loops indefinitely
+  // setup() only runs once
 void setup() {
   // Initiate serial connection with OBD-2 board @ 9600 baud
   Serial.begin(9600);
@@ -38,28 +42,21 @@ void setup() {
   lcd.print("On-Board Diagnostics");
   lcd.setCursor(1,1);
   // just a simple test to see if the variables are stored correctly in DTCletter[]
-  lcd.print(DTCletter[]);
+  lcd.print(DTCletter);
   // Runs function OBD_init() to reset the board and turn off echoing
   OBD_init();
   lcd.clear();
   //delay(250);
-  lcd.setCursor(0, 0);
-  lcd.print("DTC1: ");
-  lcd.setCursor(0, 1);
-  lcd.print("DTC2: ");
-  lcd.setCursor(0, 2);
-  lcd.print("DTC3: ");
-  lcd.noCursor();
 }
 
   // after setup() runs once, loop() can run indefinitely
 void loop() {
   // Delete any data that may be left over in the serial port.
   Serial.flush();
-  obd_init();
-  delay(5000);
   getDTC(); //run getDTC() to retrieve fault codes
-  delay(240000); // delay 240 seconds
+  // delay 240 seconds to be able to write down the codes before the loop starts over.
+  // This is just a temporary delay, while I figure out how to take things further.
+  delay(240000);
   
 }
 
@@ -76,45 +73,46 @@ void OBD_init(void) {
   Serial.flush();
 }
 
-String getDTC(void) {
+void getDTC(void) {
   Serial.flush();
   // OBD-2 mode 03 means "Read DTCs!"
   Serial.print("03\r");
   // read incoming data from OBD-2 card
   OBD_read();
-  delay(100);
-  // this for loop will iterate through the fault codes, and turn them into human-readable form
-  for (int i = 2; i < rxIndex; i+2) {
-    // Make a local variable that takes the first byte but shifted six times to the right, to be left with only a two-bit value
-    int letter = (rxData[i-2] >> 6);
-    // create a local String variable to start construction of a fault code from the deconstructed bytes
-    String localDTC = DTCletter[letter];
-    // The first digit also consists of only two bits (decimal values range from 0 up to and including 3)
-    // First we have to force the two bits forming the letter out of the byte
-    int digit1 = (rxData[i-2] << 2);
-    // Then we can force the four bits forming digit2 out of the byte
-    int digit1 = (rxData[i-2] >> 6);
-    
-    append digit1 to localDTC
-    
-    // Just realized i can bitmask... instead of elminiating bits by shifting left
-    int digit2 = (rxData[i-2] & 0b00001111);
-    
-    int digit3 = (rxData[i-1] & 0b11110000) >> 4;
-    
-    int digit4 = (rxData[i-1] & 0b00001111);
-    
-    DTClocalDTC
-    
-    
-    
+  // give the car a reasonable time to respond, this might be entirely unnecessary, but good for testing
+  delay(1000);
+  // count variable that will simplify the for loop a lot
+  int loopCount = sizeof(rxData[0]) / 2;
+  // I will make a separate variable to make sure we can go through one byte of rxData at a time
+  int byteCount = 0;
+  // Each iteration will go through 2 bytes
+  for (int i = 0; i < loopCount; i++) {
+    // Set the first char in each row of the two-dimensional char array to whatever the output of DTCletter[letter] is.
+    DTCarray[i][0] = DTCletter[rxData[i] >> 6];
+    // The first digit also consists of only two bits (decimal values range from 0 up to and including 3).
+    DTCarray[i][1] = ((rxData[byteCount] >> 4) & 0b00000011);
+    // The last three digits are each one nibble (half-byte)
+    DTCarray[i][2] = (rxData[byteCount] & 0xf);
+    // Now we've depleted the first byte of information in this DTC, so we move on to the second one.
+    byteCount++;
+    DTCarray[i][3] = (rxData[byteCount] >> 4 & 0xf);
+    DTCarray[i][4] = (rxData[byteCount] & 0xf);
+    byteCount++;
+  }
+  for (int i = 0; i < 8; i++) {
+    // I came up with this way of moving the cursor around while keeping int i simple, and it seems pretty neat (Let's pray it works)!
+    lcd.setCursor(floor(i / 4) * 10), i % 4);
+    for (int j = 0; j > 6; j++) {
+      lcd.print("DTC" + [i + 1] + ":" + DTCarray[i][j];
+    }
   }
 }
 
-// This function stores each byte read in a local variable, adds it to the global buffer array rxData[]
+// This function stores each byte read in a local char c, and adds it to the global buffer array rxData[]
 void OBD_read(void) {
   char c;
   do{
+    // basically, if there's traffic, parse it
     if(Serial.available() > 0)
     {
       c = Serial.read();
@@ -127,3 +125,4 @@ void OBD_read(void) {
   }while(c != '>'); //The ELM327 ends its response with this char so when we get it we exit out.
   rxData[rxIndex++] = '\0';//Converts the array into a string
   rxIndex=0; //Set this to 0 so next time we call the read we get a "clean buffer"
+}
