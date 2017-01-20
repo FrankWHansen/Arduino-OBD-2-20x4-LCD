@@ -13,11 +13,11 @@
   char rxData[20];
   char rxIndex=0;
 
-  // An array that stores the 4 possible letters the first char a DTC can be
-  // P = Powertrain, C = Chassis, B = Body, U = Network, '\0' = NULL value
-  char DTCletter[] = {'P', 'C', 'B', 'U', '\0'};
+  // A fixed array that stores the 4 possible letters the first char a DTC can be
+  // P = Powertrain, C = Chassis, B = Body, U = Network
+  const char DTCletter[] = {'P', 'C', 'B', 'U', '\0'};
 
-  // 2dim array with room for 8 DTCs. Each row can hold a 5 char DTC + NULL
+  // 2dim array with room for 8 DTCs. Each row can hold a 5 char DTC
   char DTCarray[8][6]; // figure out if needs to be 9/6 (most likely null value in both dimensions)
   
 void setup() {
@@ -28,7 +28,7 @@ void setup() {
   lcd.begin(20, 4);
   lcd.setCursor(0,1);
   lcd.print("On-Board Diagnostics");
-  lcd.setCursor(1,1);
+  lcd.setCursor(0,2);
   // just a simple test to see if the variables are stored correctly in DTCletter[]
   lcd.print(DTCletter[]);
   // OBD_init() resets OBD-II board and turns off echoing
@@ -44,6 +44,7 @@ void setup() {
 void loop() {
   // Delete any data that may be left over in the serial port.
   Serial.flush();
+  delay(200);
   getDTC(); //run getDTC() to retrieve fault codes
   // delay 240 seconds to be able to write down the codes before the loop starts over.
   // This is just a temporary delay, while I figure out how to take things further.
@@ -64,11 +65,11 @@ void OBD_init(void) {
   Serial.flush();
 }
 
-void getDTC(void) {
+char getDTC(void) {
   lcd.setCursor(0,1);
   lcd.print("getDTC() started");
   Serial.flush();
-  // OBD-2 mode 03 means "Read DTCs!"
+  // OBD-2 mode 03: "Read DTCs!"
   Serial.print("03\r");
   // read incoming data from OBD-2 card
   OBD_read();
@@ -83,7 +84,7 @@ void getDTC(void) {
     // Set the first char in each row of the two-dimensional char array to whatever the output of DTCletter[letter] is.
     DTCarray[i][0] = DTCletter[rxData[i] >> 6];
     // The first digit also consists of only two bits (decimal values range from 0 up to and including 3).
-    DTCarray[i][1] = ((rxData[byteCount] >> 4) & 0b00000011);
+    DTCarray[i][1] = ((rxData[byteCount] >> 4) & 0x3);
     // The last three digits are each one nibble (half-byte)
     DTCarray[i][2] = (rxData[byteCount] & 0xf);
     // Now we've depleted the first byte of information in this DTC, so we move on to the second one.
