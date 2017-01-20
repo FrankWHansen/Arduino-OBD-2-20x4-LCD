@@ -1,55 +1,46 @@
-  // I've taken example code from Sparkfun, but a fixed version from kiteman (3rd post from top), at
-  // https://forum.sparkfun.com/viewtopic.php?f=14&t=35507, and modified it since I'm working with
-  // a parallel LCD screen and I want to read Diagnostic Trouble Code(DTC)s instead of getting a live
-  // feed of data from the car (speed, rpm, coolant temp etc) like most people seem to be interested in.
+  // Hardware: Arduino Uno, Sparkfun OBD-II UART board, 20x4 character parallel LCD
+  // Code: https://forum.sparkfun.com/viewtopic.php?f=14&t=35507 kiteman, 3rd post.
   
-  // I currently have an ugly prototype of a scantool, that might at any moment fall apart,
-  // but my plan is to implement this work-in-progress software in a more compact and user-friendly form factor.
-
-  // A DTC consists of a five-character code - one letter followed by four digits.
-  // https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_3_.28no_PID_required.29 is a great reference to understand its composition.
-
-  // There is a great chance this code isn't working at all because of my inexperience, but if it is,
-  // take special care not to trust more than the first 2 DTCs:
-  // As the link to wiki states, further DTCs will come with overhead/frames from the car, and I need to analyze the different manufacturer's protocols
-  // to be able to figure out how to extract the information I need to produce more DTCs.
+  // I have modified this code to work with my parallel LCD, and to be able to read
+  // Diagnostic Trouble Code(DTC)s instead of getting a live feed of data from the car.
+  // DTC primer: https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_3_.28no_PID_required.29
   
-  // include library for parallel LCD screen:
   #include <LiquidCrystal.h>
 
-  // initialize the library with the numbers of the interface pins
   LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 
-  //This is a character buffer that will store the data from the serial port
+  // Character buffer to store data from the serial port
   char rxData[20];
   char rxIndex=0;
 
-  // An array that stores the 4 possible letters that make out the most significant value of the DTC
-  char DTCletter[5] = {'P', 'C', 'B', 'U', '\0'}; // P = Powertrain, C = Chassis, B = Body, U = Network, '\0' = null character that arrays apparently always technically end with.
+  // An array that stores the 4 possible letters the first char a DTC can be
+  // P = Powertrain, C = Chassis, B = Body, U = Network, '\0' = NULL value
+  char DTCletter[] = {'P', 'C', 'B', 'U', '\0'};
 
-  // I'll make room for 8 DTCs. Each row in this array will store a DTC of five chars plus the null character.
-  char DTCarray[8][6];
-
-  // setup() only runs once
+  // 2dim array with room for 8 DTCs. Each row can hold a 5 char DTC + NULL
+  char DTCarray[8][6]; // figure out if needs to be 9/6 (most likely null value in both dimensions)
+  
 void setup() {
   // Initiate serial connection with OBD-2 board @ 9600 baud
   Serial.begin(9600);
   
-  // set up the LCD's number of columns and rows:
+  // set up LCD columns & rows, then display a simple welcome screen
   lcd.begin(20, 4);
-  // Print a message to the LCD.
   lcd.setCursor(0,1);
   lcd.print("On-Board Diagnostics");
   lcd.setCursor(1,1);
   // just a simple test to see if the variables are stored correctly in DTCletter[]
-  lcd.print(DTCletter);
-  // Runs function OBD_init() to reset the board and turn off echoing
+  lcd.print(DTCletter[]);
+  // OBD_init() resets OBD-II board and turns off echoing
+  lcd.setCursor(0,3);
+  lcd.print("OBD_init() starting");
   OBD_init();
+  lcd.setCursor(0,3);
+  lcd.print("OBD_init() finished");
+  delay(2000);
   lcd.clear();
-  //delay(250);
 }
 
-  // after setup() runs once, loop() can run indefinitely
 void loop() {
   // Delete any data that may be left over in the serial port.
   Serial.flush();
@@ -74,12 +65,14 @@ void OBD_init(void) {
 }
 
 void getDTC(void) {
+  lcd.setCursor(0,1);
+  lcd.print("getDTC() started");
   Serial.flush();
   // OBD-2 mode 03 means "Read DTCs!"
   Serial.print("03\r");
   // read incoming data from OBD-2 card
   OBD_read();
-  // give the car a reasonable time to respond, this might be entirely unnecessary, but good for testing
+  // give the car a reasonable time to respond
   delay(1000);
   // count variable that will simplify the for loop a lot
   int loopCount = sizeof(rxData[0]) / 2;
@@ -100,7 +93,6 @@ void getDTC(void) {
     byteCount++;
   }
   for (int i = 0; i < 8; i++) {
-    // I came up with this way of moving the cursor around while keeping int i simple, and it seems pretty neat (Let's pray it works)!
     lcd.setCursor((floor(i / 4) * 10), i % 4);
     for (int j = 0; j > 6; j++) {
       lcd.print("DTC" + (i + 1) + ':' + DTCarray[i][j]);
@@ -108,7 +100,7 @@ void getDTC(void) {
   }
 }
 
-// This function stores each byte read in a local char c, and adds it to the global buffer array rxData[]
+// This function stores each byte read in a local char c, and adds it to the buffer array rxData[]
 void OBD_read(void) {
   char c;
   do{
