@@ -10,15 +10,15 @@
   LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 
   // Character buffer to store data from the serial port
-  char rxData[20];
+  char rxData[];
   char rxIndex=0;
 
   // A fixed array that stores the 4 possible letters the first char a DTC can be
   // P = Powertrain, C = Chassis, B = Body, U = Network
-  const char DTCletter[] = {'P', 'C', 'B', 'U', '\0'};
+  const char DTCletter[] = {'P', 'C', 'B', 'U'};
 
   // 2dim array with room for 8 DTCs. Each row can hold a 5 char DTC
-  char DTCarray[8][6]; // figure out if needs to be 9/6 (most likely null value in both dimensions)
+  char DTCarray[][]; // figure out if needs to be 9/6 (most likely null value in both dimensions)
   
 void setup() {
   // Initiate serial connection with OBD-2 board @ 9600 baud
@@ -76,14 +76,14 @@ char getDTC(void) {
   // give the car a reasonable time to respond
   delay(1000);
   // count variable that will simplify the for loop a lot
-  int loopCount = sizeof(rxData[0]) / 2;
+  int loopCount = sizeof(rxData[]) / 2;
   // I will make a separate variable to make sure we can go through one byte of rxData at a time
   int byteCount = 0;
   // Each iteration will go through 2 bytes
   for (int i = 0; i < loopCount; i++) {
-    // Set the first char in each row of the two-dimensional char array to whatever the output of DTCletter[letter] is.
-    DTCarray[i][0] = DTCletter[rxData[i] >> 6];
-    // The first digit also consists of only two bits (decimal values range from 0 up to and including 3).
+    // Set the first char to whatever the output of DTCletter[] is.
+    DTCarray[i][0] = DTCletter[rxData[byteCount]] >> 6];
+    // The first digit also consists of only two bits
     DTCarray[i][1] = ((rxData[byteCount] >> 4) & 0x3);
     // The last three digits are each one nibble (half-byte)
     DTCarray[i][2] = (rxData[byteCount] & 0xf);
@@ -109,7 +109,6 @@ void OBD_read(void) {
     if(Serial.available() > 0)
     {
       c = Serial.read();
-      //lcd.print(c);
       if((c!= '>') && (c!='\r') && (c!='\n')) //Keep these out of our buffer
       {
         rxData[rxIndex++] = c; //Add whatever we receive to the buffer
