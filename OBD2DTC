@@ -99,6 +99,9 @@ char getDTC(void) {
       lcd.print("DTC" + (i + 1) + ':' + DTCarray[i][j]);
     }
   }
+  // delay 240 seconds to be able to write down the codes before the loop starts over.
+  // This is just a temporary delay, while I figure out how to take things further.
+  delay(240000);
 }
 
 // This function stores each byte read in a local char c, and adds it to the buffer array rxData[]
