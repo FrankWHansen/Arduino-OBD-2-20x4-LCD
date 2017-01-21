@@ -95,7 +95,7 @@ char getDTC(void) {
   }
   for (int i = 0; i < 8; i++) {
     lcd.setCursor((floor(i / 4) * 10), i % 4);
-    for (int j = 0; j > 6; j++) {
+    for (int j = 0; j < 6; j++) {
       lcd.print("DTC" + (i + 1) + ':' + DTCarray[i][j]);
     }
   }
