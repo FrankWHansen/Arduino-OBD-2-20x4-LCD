@@ -10,7 +10,7 @@
   LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 
   // Character buffer to store data from the serial port
-  char rxData[];
+  char rxData[20];
   char rxIndex=0;
 
   // A fixed array that stores the 4 possible letters the first char a DTC can be
@@ -18,7 +18,7 @@
   const char DTCletter[] = {'P', 'C', 'B', 'U'};
 
   // 2dim array with room for 8 DTCs. Each row can hold a 5 char DTC
-  char DTCarray[][]; // figure out if needs to be 9/6 (most likely null value in both dimensions)
+  char DTCarray[9][6];
   
 void setup() {
   // Initiate serial connection with OBD-2 board @ 9600 baud
@@ -30,7 +30,7 @@ void setup() {
   lcd.print("On-Board Diagnostics");
   lcd.setCursor(0,2);
   // just a simple test to see if the variables are stored correctly in DTCletter[]
-  lcd.print(DTCletter[]);
+  lcd.print(DTCletter);
   // OBD_init() resets OBD-II board and turns off echoing
   lcd.setCursor(0,3);
   lcd.print("OBD_init() starting");
@@ -76,27 +76,33 @@ char getDTC(void) {
   // give the car a reasonable time to respond
   delay(1000);
   // count variable that will simplify the for loop a lot
-  int loopCount = sizeof(rxData[]) / 2;
+  int loopCount = (sizeof(rxData) - 1) / 2; //
   // I will make a separate variable to make sure we can go through one byte of rxData at a time
   int byteCount = 0;
   // Each iteration will go through 2 bytes
-  for (int i = 0; i < loopCount; i++) {
-    // Set the first char to whatever the output of DTCletter[] is.
-    DTCarray[i][0] = DTCletter[rxData[byteCount]] >> 6];
-    // The first digit also consists of only two bits
-    DTCarray[i][1] = ((rxData[byteCount] >> 4) & 0x3);
-    // The last three digits are each one nibble (half-byte)
-    DTCarray[i][2] = (rxData[byteCount] & 0xf);
-    // Now we've depleted the first byte of information in this DTC, so we move on to the second one.
-    byteCount++;
-    DTCarray[i][3] = (rxData[byteCount] >> 4 & 0xf);
-    DTCarray[i][4] = (rxData[byteCount] & 0xf);
-    byteCount++;
-  }
+  do {
+    for (int i = 0; i < loopCount; i++) {
+      // Set the first char to whatever the output of DTCletter[] is.
+      DTCarray[i][0] = DTCletter[rxData[byteCount] >> 6];
+      // The first digit also consists of only two bits
+      DTCarray[i][1] = ((rxData[byteCount] >> 4) & 0x3);
+      // The last three digits are each one nibble (half-byte)
+      DTCarray[i][2] = (rxData[byteCount] & 0xf);
+      // Now we've depleted the first byte of information in this DTC, so we move on to the second one.
+      byteCount++;
+      DTCarray[i][3] = (rxData[byteCount] >> 4 & 0xf);
+      DTCarray[i][4] = (rxData[byteCount] & 0xf);
+      DTCarray[i][5] = '\0';
+      byteCount++;
+      delay(2000);
+    }
+  }while (rxData[byteCount] != '\0');
+  
   for (int i = 0; i < 8; i++) {
     lcd.setCursor((floor(i / 4) * 10), i % 4);
-    for (int j = 0; j < 6; j++) {
-      lcd.print("DTC" + (i + 1) + ':' + DTCarray[i][j]);
+    lcd.print("DTC" + (i + 1) + ':');
+    for (int j = 0; j < 5; j++) {
+      lcd.print(DTCarray[i][j]);
     }
   }
   // delay 240 seconds to be able to write down the codes before the loop starts over.
