@@ -1,1 +1,163 @@
+  // include the library code:
+  #include <LiquidCrystal.h>
 
+  // initialize the library with the numbers of the interface pins
+  LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+
+  //This is a character buffer that will store the data from the serial port
+  char rxData[20];
+  char rxIndex=0;
+
+  //Variables to hold vehicle data.
+  int vehicleSpeed=0;
+  int vehicleRPM=0;
+  bool spark_plugs = false;
+  bool MIL = false;
+  int DTC_count = -1;
+  char freezeframe[6];
+  int intake_air_temp = 215;
+  int coolant_temp = 215;
+  int oil_temp = 215;
+  char engineOnTime[3];
+  int throttle_pos = 0;
+  int voltage = 0;
+  
+  
+
+
+
+void setup() {
+
+  Serial.begin(9600);
+  
+  // set up the LCD's number of columns and rows:
+  lcd.begin(20, 4);
+  // Print a message to the LCD.
+  lcd.setCursor(0,1);
+  lcd.print("On-Board Diagnostics");
+  lcd.setCursor(0,2);
+  lcd.print("OBD_init() start");
+  OBD_init();
+  lcd.setCursor(0,2);
+  lcd.print("OBD_init() finish");
+  lcd.setCursor(0,3);
+  lcd.print("Reset, echo off");
+  delay(3000);
+  lcd.clear();
+  lcd.noCursor();
+}
+
+void loop() {
+
+  for (i = 0, i < 40, i++) {
+    tempscreen();
+    delay(250);
+  }
+
+}
+
+void OBD_init(void)
+{
+  //Wait for a little while before sending the reset command to the OBD-II-UART
+  delay(2000);
+  //Reset the OBD-II-UART
+  Serial.print("ATZ\r");
+  //Wait for a bit before starting to send commands after the reset.
+  delay(2000);
+  OBD_read();
+  Serial.print("ATE0\r");
+  OBD_read();
+  Serial.flush();
+}
+
+// Displays Air intake, coolant and oil temps, as well as engine running time.
+void tempscreen(void)
+{
+  lcd.setCursor(0,0);
+  lcd.print("Intake Air:  ", getIntakeAirTemp());
+  serial.flush();
+  lcd.setCursor(0,1);
+  lcd.print("Coolant Tmp: ", getCoolantTemp());
+  serial.flush();
+  lcd.setCursor(0,2);
+  lcd.print("Oil Temp:  ", getOilTemp());
+  serial.flush();
+  lcd.setCursor(0,3);
+  getEngineOnTime();
+  lcd.print("Engine ONtime:", engineOnTime);
+}
+
+
+int getRPM(void)
+{
+  //Query the OBD-II-UART for the Vehicle rpm
+  Serial.flush();
+  Serial.print("010C\r");
+  OBD_read();
+
+  return ((strtol(&rxData[6],0,16)*256)+strtol(&rxData[9],0,16))/4;
+}
+
+void getEngineOnTime(void)
+{
+  //Query the OBD-II-UART for the time the Engine has been running
+  Serial.flush();
+  Serial.print("011F\r");
+  OBD_read();
+
+  int = secondsRunning = ((strtol(&rxData[6],0,16)*256)+strtol(&rxData[9],0,16));
+  int hours = floor(secondsRunning / 3600);
+  int minutes = floor(secondsRunning % 60);
+  int seconds = floor((secondsRunning / 60) % 60);
+  engineOnTime = {hours, minutes, seconds};
+}
+
+
+int getCoolantTemp(void)
+{
+  //Query the OBD-II-UART for the Engine Coolant Temp
+  Serial.flush();
+  Serial.print("0105\r");
+  OBD_read();
+
+  return strtol(&rxData[6],0,16)-40;
+}
+
+int getOilTemp(void)
+{
+  //Query the OBD-II-UART for the Engine Oil Temp
+  Serial.flush();
+  Serial.print("015C\r");
+  OBD_read();
+
+  return strtol(&rxData[6],0,16)-40;
+}
+
+int getIntakeAirTemp(void)
+{
+  //Query the OBD-II-UART for the Intake Air Temp
+  Serial.flush();
+  Serial.print("010F\r");
+  OBD_read();
+
+  return strtol(&rxData[6],0,16)-40;
+}
+
+
+void OBD_read(void)
+{
+  char c;
+  do{
+    if(Serial.available() > 0)
+    {
+      c = Serial.read();
+      //lcd.print(c);
+      if((c!= '>') && (c!='\r') && (c!='\n')) //Keep these out of our buffer
+      {
+        rxData[rxIndex++] = c; //Add whatever we receive to the buffer
+      }  
+     }     
+  }while(c != '>'); //The ELM327 ends its response with this char so when we get it we exit out.
+  rxData[rxIndex++] = '\0';//Converts the array into a string
+  rxIndex=0; //Set this to 0 so next time we call the read we get a "clean buffer"
+}
